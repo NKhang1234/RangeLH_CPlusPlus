@@ -1,0 +1,13 @@
+# Ignore CMake build directory
+build/
+bin/
+Testing/
+
+# Ignore IDE specific folders
+.vscode/
+.idea/
+
+# Ignore compiled binaries
+*.o
+*.a
+*.so
