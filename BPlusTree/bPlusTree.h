@@ -1,245 +1,147 @@
-#include <algorithm>
 #include <iostream>
 #include <vector>
 #include <string>
-#include <data.h>
+#include <algorithm>
+#include "data.h"
 
-using namespace std;
-
-/* ===================== B+ Tree ===================== */
-
-template <typename T>
-class BPlusTree {
-private:
-    struct Node {
-        bool isLeaf;
-
-        // Internal nodes
-        vector<T> keys;
-        vector<Node*> children;
-
-        // Leaf nodes
-        vector<pair<T, Data*>> entries;
-        Node* next;
-
-        Node(bool leaf = false)
-            : isLeaf(leaf), next(nullptr) {}
-    };
-
-    Node* root;
-    int t; // minimum degree
-
-private:
-    /* ---------- Core helpers ---------- */
-
-    void splitChild(Node* parent, int index, Node* child);
-    void insertNonFull(Node* node, T key, Data* value);
-
-    void printTree(Node* node, int level) const;
-    void destroy(Node* node);
-
+class Node {
+protected:
+    bool is_leaf;
+    std::vector<int> keys;
+    Node* parent;
+    
 public:
-    explicit BPlusTree(int degree)
-        : root(nullptr), t(degree) {}
-
-    ~BPlusTree() { destroy(root); }
-
-    void insert(T key, Data* value);
-    Data* search(T key) const;
-    vector<Data*> rangeQuery(T lower, T upper) const;
-
-    void printTree() const { printTree(root, 0); }
+    Node(bool leaf = false) : is_leaf(leaf), parent(nullptr) {}
+    virtual ~Node() {}
+    
+    bool isLeaf() const { return is_leaf; }
+    std::vector<int>& getKeys() { return keys; }
+    const std::vector<int>& getKeys() const { return keys; }
+    
+    friend class BPlusTree;
 };
 
-/* ===================== Insert ===================== */
+class LeafNode : public Node {
+private:
+    std::vector<Data*> data_ptrs;
+    LeafNode* next;
+    LeafNode* prev;
+    
+public:
+    LeafNode() : Node(true), next(nullptr), prev(nullptr) {}
+    
+    std::vector<Data*>& getDataPtrs() { return data_ptrs; }
+    const std::vector<Data*>& getDataPtrs() const { return data_ptrs; }
+    
+    friend class BPlusTree;
+};
 
-template <typename T>
-void BPlusTree<T>::insert(T key, Data* value) {
-    if (!root) {
-        root = new Node(true);
-        root->entries.push_back({key, value});
-        return;
-    }
-
-    if (root->keys.size() == 2 * t - 1) {
-        Node* newRoot = new Node(false);
-        newRoot->children.push_back(root);
-        splitChild(newRoot, 0, root);
-        root = newRoot;
-    }
-
-    insertNonFull(root, key, value);
-}
-
-template <typename T>
-void BPlusTree<T>::insertNonFull(Node* node, T key, Data* value) {
-    if (node->isLeaf) {
-        auto it = upper_bound(
-            node->entries.begin(),
-            node->entries.end(),
-            key,
-            [](const T& k, const pair<T, Data*>& e) {
-                return k < e.first;
-            });
-
-        node->entries.insert(it, {key, value});
-        return;
-    }
-
-    int i = 0;
-    while (i < node->keys.size() && key >= node->keys[i]) {
-        i++;
-    }
-
-    if (node->children[i]->keys.size() == 2 * t - 1) {
-        splitChild(node, i, node->children[i]);
-        if (key >= node->keys[i]) {
-            i++;
+class InternalNode : public Node {
+private:
+    std::vector<Node*> children;
+    
+public:
+    InternalNode() : Node(false) {}
+    
+    ~InternalNode() {
+        for (Node* child : children) {
+            delete child;
         }
     }
+    
+    std::vector<Node*>& getChildren() { return children; }
+    const std::vector<Node*>& getChildren() const { return children; }
+    
+    friend class BPlusTree;
+};
 
-    insertNonFull(node->children[i], key, value);
-}
+class BPlusTree {
+private:
+    Node* root;
+    int order; // Maximum number of keys per node
+    int count;
+    
+    // Find the leaf node where key should be inserted
+    LeafNode* findLeaf(int key);
+    
+    // Split a leaf node
+    void splitLeaf(LeafNode* leaf);
+    
+    // Split an internal node
+    void splitInternal(InternalNode* internal);
+    
+    // Insert key into parent after split
+    void insertIntoParent(Node* left, int key, Node* right);
 
-/* ===================== Split ===================== */
+    // Get the index of a child in its parent
+    int getChildIndex(InternalNode* parent, Node* child);
 
-template <typename T>
-void BPlusTree<T>::splitChild(Node* parent, int index, Node* child) {
-    if (child->isLeaf) {
-        Node* newLeaf = new Node(true);
+    // Borrow from left sibling (leaf)
+    bool borrowFromLeftLeaf(LeafNode* leaf, LeafNode* left_sibling, InternalNode* parent, int parent_key_idx);
 
-        parent->children.insert(
-            parent->children.begin() + index + 1, newLeaf);
+    // Borrow from right sibling (leaf)
+    bool borrowFromRightLeaf(LeafNode* leaf, LeafNode* right_sibling, InternalNode* parent, int parent_key_idx);
 
-        newLeaf->entries.assign(
-            child->entries.begin() + t,
-            child->entries.end());
+    // Borrow from left sibling (internal)
+    bool borrowFromLeftInternal(InternalNode* node, InternalNode* left_sibling, InternalNode* parent, int parent_key_idx);
 
-        child->entries.resize(t);
+    // Borrow from right sibling (internal)
+    bool borrowFromRightInternal(InternalNode* node, InternalNode* right_sibling, InternalNode* parent, int parent_key_idx);
 
-        parent->keys.insert(
-            parent->keys.begin() + index,
-            newLeaf->entries.front().first);
+    // Merge with left sibling (leaf)
+    void mergeWithLeftLeaf(LeafNode* leaf, LeafNode* left_sibling, InternalNode* parent, int parent_key_idx);
 
-        newLeaf->next = child->next;
-        child->next = newLeaf;
-        return;
+    // Merge with right sibling (leaf)
+    void mergeWithRightLeaf(LeafNode* leaf, LeafNode* right_sibling, InternalNode* parent, int parent_key_idx);
+
+    // Merge with left sibling (internal)
+    void mergeWithLeftInternal(InternalNode* node, InternalNode* left_sibling, InternalNode* parent, int parent_key_idx);
+
+    // Merge with right sibling (internal)
+    void mergeWithRightInternal(InternalNode* node, InternalNode* right_sibling, InternalNode* parent, int parent_key_idx);
+
+    // Handle underflow in a node
+    void handleUnderflow(Node* node);
+    
+public:
+    BPlusTree(int ord = 3) : root(nullptr), order(ord), count(0) {
+        if (order < 3) order = 3; // Minimum order
     }
 
-    Node* newInternal = new Node(false);
+    ~BPlusTree() {
+        delete root;
+    }
+    
+    // Insert a data pointer
+    void insert(Data* data);
 
-    parent->children.insert(
-        parent->children.begin() + index + 1, newInternal);
+    // Search for data by key
+    Data* search(int key);
 
-    parent->keys.insert(
-        parent->keys.begin() + index,
-        child->keys[t - 1]);
+    std::vector<Data*> rangeSearch(int key_start, int key_end);
 
-    newInternal->keys.assign(
-        child->keys.begin() + t,
-        child->keys.end());
+    bool remove(int key);
+    
+    // Print the tree structure
+    void printTree();
+    
+    // Print all leaf data in order
+    void printLeafData();
 
-    child->keys.resize(t - 1);
-
-    newInternal->children.assign(
-        child->children.begin() + t,
-        child->children.end());
-
-    child->children.resize(t);
-}
-
-/* ===================== Search ===================== */
-
-template <typename T>
-Data* BPlusTree<T>::search(T key) const {
-    Node* cur = root;
-    if (!cur) return nullptr;
-
-    while (!cur->isLeaf) {
-        int i = 0;
-        while (i < cur->keys.size() && key >= cur->keys[i]) {
-            i++;
-        }
-        cur = cur->children[i];
+    inline int getOrder() const {
+        return order;
     }
 
-    for (const auto& [k, v] : cur->entries) {
-        if (k == key) return v;
+    inline bool isEmpty() const {
+        return root == nullptr;
     }
 
-    return nullptr;
-}
-
-/* ===================== Range Query ===================== */
-
-template <typename T>
-vector<Data*> BPlusTree<T>::rangeQuery(T lower, T upper) const {
-    vector<Data*> result;
-    if (!root) return result;
-
-    Node* cur = root;
-
-    while (!cur->isLeaf) {
-        int i = 0;
-        while (i < cur->keys.size() && lower >= cur->keys[i]) {
-            i++;
-        }
-        cur = cur->children[i];
+    inline Node* getRoot() const {
+        return root;
     }
 
-    while (cur) {
-        for (const auto& [k, v] : cur->entries) {
-            if (k >= lower && k <= upper)
-                result.push_back(v);
-            else if (k > upper)
-                return result;
-        }
-        cur = cur->next;
-    }
+    std::vector<int> getAllKeysInOrder();
 
-    return result;
-}
-
-/* ===================== Utilities ===================== */
-
-template <typename T>
-void BPlusTree<T>::printTree(Node* node, int level) const {
-    if (!node) return;
-
-    for (int i = 0; i < level; i++) cout << "  ";
-
-    if (node->isLeaf) {
-        cout << "[Leaf] ";
-        for (auto& e : node->entries) {
-            cout << e.first << " ";
-        }
-    } else {
-        cout << "[Internal] ";
-        for (auto& k : node->keys) {
-            cout << k << " ";
-        }
-    }
-    cout << "\n";
-
-    for (Node* child : node->children) {
-        printTree(child, level + 1);
-    }
-}
-
-template <typename T>
-void BPlusTree<T>::destroy(Node* node) {
-    if (!node) return;
-
-    if (node->isLeaf) {
-        for (auto& e : node->entries) {
-            delete e.second;
-        }
-    }
-
-    for (Node* c : node->children) {
-        destroy(c);
-    }
-
-    delete node;
-}
+    std::vector<Data*> getAllDataInOrder();
+};
 

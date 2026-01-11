@@ -1,345 +1,775 @@
 #include <gtest/gtest.h>
-#include <memory>
 #include <vector>
-#include <random>
 #include <algorithm>
-#include <set>
-#include <chrono>
+#include <random>
+#include <memory>
 #include "bPlusTree.h"
 
-// Include your B+ tree implementation here
-// #include "bplustree.h"
-
-
-// Fixture class for B+ Tree tests
-template<int ORDER = 128>
+// Test Fixture
 class BPlusTreeTest : public ::testing::Test {
 protected:
-    std::unique_ptr<BPlusTree<int, ORDER>> tree;
     std::vector<Data*> test_data;
     
     void SetUp() override {
-        tree = std::make_unique<BPlusTree<int, ORDER>>();
+        test_data.clear();
     }
     
     void TearDown() override {
-        // Clean up all data after the test is done
-        for (auto d : test_data) {
+        for (Data* d : test_data) {
             delete d;
         }
         test_data.clear();
     }
     
+    Data* createData(int id, const std::string& content) {
+        Data* d = new Data(id, content);
+        test_data.push_back(d);
+        return d;
+    }
 };
 
-// Instantiate test suite with different orders
-using BPlusTreeTestSmall = BPlusTreeTest<5>;
-using BPlusTreeTestMedium = BPlusTreeTest<32>;
-using BPlusTreeTestLarge = BPlusTreeTest<128>;
+// ============================================================================
+// BASIC FUNCTIONALITY TESTS
+// ============================================================================
 
-// Basic Insert and Search Tests
-TEST_F(BPlusTreeTestSmall, InsertSingleElement) {
-    Data* d = new Data(1, "First Record");
-    test_data.push_back(d);
-    tree->insert(1, d);
-    
-    EXPECT_EQ(tree->size(), 1);
-    Data* result = tree->search(1);
-    ASSERT_NE(result, nullptr);
-    EXPECT_EQ(result->getRecordID(), 1);
-    EXPECT_EQ(result->getData(), "First Record");
+TEST_F(BPlusTreeTest, ConstructorDefaultOrder) {
+    BPlusTree tree;
+    EXPECT_EQ(tree.getOrder(), 3);
+    EXPECT_TRUE(tree.isEmpty());
 }
 
-TEST_F(BPlusTreeTestSmall, InsertMultipleElements) {
-    for (int i = 0; i < 10; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
+TEST_F(BPlusTreeTest, ConstructorCustomOrder) {
+    BPlusTree tree(5);
+    EXPECT_EQ(tree.getOrder(), 5);
+    EXPECT_TRUE(tree.isEmpty());
+}
+
+TEST_F(BPlusTreeTest, ConstructorMinimumOrderEnforcement) {
+    BPlusTree tree(2);
+    EXPECT_EQ(tree.getOrder(), 3);
+    
+    BPlusTree tree2(1);
+    EXPECT_EQ(tree2.getOrder(), 3);
+}
+
+TEST_F(BPlusTreeTest, EmptyTreeSearch) {
+    BPlusTree tree(3);
+    EXPECT_TRUE(tree.isEmpty());
+    EXPECT_EQ(tree.search(10), nullptr);
+    EXPECT_EQ(tree.search(0), nullptr);
+    EXPECT_EQ(tree.search(-5), nullptr);
+}
+
+TEST_F(BPlusTreeTest, SingleInsertion) {
+    BPlusTree tree(3);
+    Data* d = createData(10, "Record 10");
+    
+    tree.insert(d);
+    EXPECT_FALSE(tree.isEmpty());
+    
+    Data* found = tree.search(10);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->getRecordID(), 10);
+    EXPECT_EQ(found->getData(), "Record 10");
+}
+
+TEST_F(BPlusTreeTest, SingleInsertionRootIsLeaf) {
+    BPlusTree tree(3);
+    Data* d = createData(10, "Record 10");
+    
+    tree.insert(d);
+    
+    Node* root = tree.getRoot();
+    ASSERT_NE(root, nullptr);
+    EXPECT_TRUE(root->isLeaf());
+}
+
+// ============================================================================
+// MULTIPLE INSERTIONS TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, MultipleInsertionsAscending) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 5; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
     }
     
-    EXPECT_EQ(tree->size(), 10);
-    
-    for (int i = 0; i < 10; ++i) {
-        Data* result = tree->search(i);
-        ASSERT_NE(result, nullptr);
-        EXPECT_EQ(result->getRecordID(), i);
+    for (int i = 1; i <= 5; i++) {
+        Data* found = tree.search(i * 10);
+        ASSERT_NE(found, nullptr);
+        EXPECT_EQ(found->getRecordID(), i * 10);
+        EXPECT_EQ(found->getData(), "Record " + std::to_string(i * 10));
     }
 }
 
-TEST_F(BPlusTreeTestSmall, SearchNonExistentKey) {
-    Data* d = new Data(5, "Record 5");
-    test_data.push_back(d);
-    tree->insert(5, d);
+TEST_F(BPlusTreeTest, MultipleInsertionsDescending) {
+    BPlusTree tree(3);
     
-    Data* result = tree->search(10);
-    EXPECT_EQ(result, nullptr);
-}
-
-TEST_F(BPlusTreeTestSmall, InsertAscendingOrder) {
-    const int n = 100;
-    for (int i = 0; i < n; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
+    for (int i = 5; i >= 1; i--) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
     }
     
-    EXPECT_EQ(tree->size(), n);
-    
-    for (int i = 0; i < n; ++i) {
-        Data* result = tree->search(i);
-        ASSERT_NE(result, nullptr) << "Failed to find key: " << i;
-        EXPECT_EQ(result->getRecordID(), i);
+    for (int i = 1; i <= 5; i++) {
+        Data* found = tree.search(i * 10);
+        ASSERT_NE(found, nullptr);
+        EXPECT_EQ(found->getRecordID(), i * 10);
     }
 }
 
-TEST_F(BPlusTreeTestSmall, InsertDescendingOrder) {
-    const int n = 100;
-    for (int i = n - 1; i >= 0; --i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
+TEST_F(BPlusTreeTest, MultipleInsertionsRandom) {
+    BPlusTree tree(3);
+    
+    std::vector<int> keys = {15, 10, 25, 5, 20, 30, 35};
+    for (int key : keys) {
+        tree.insert(createData(key, "Record " + std::to_string(key)));
     }
     
-    EXPECT_EQ(tree->size(), n);
-    
-    for (int i = 0; i < n; ++i) {
-        Data* result = tree->search(i);
-        ASSERT_NE(result, nullptr) << "Failed to find key: " << i;
-        EXPECT_EQ(result->getRecordID(), i);
+    for (int key : keys) {
+        Data* found = tree.search(key);
+        ASSERT_NE(found, nullptr);
+        EXPECT_EQ(found->getRecordID(), key);
     }
 }
 
-TEST_F(BPlusTreeTestSmall, InsertRandomOrder) {
-    const int n = 100;
-    std::vector<int> keys(n);
-    for (int i = 0; i < n; ++i) keys[i] = i;
+// ============================================================================
+// ORDERING AND TRAVERSAL TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, OrderMaintainedAfterInsertions) {
+    BPlusTree tree(3);
+    
+    std::vector<int> keys = {15, 10, 25, 5, 20, 30, 35};
+    for (int key : keys) {
+        tree.insert(createData(key, "Record " + std::to_string(key)));
+    }
+    
+    std::vector<int> ordered_keys = tree.getAllKeysInOrder();
+    std::vector<int> expected = {5, 10, 15, 20, 25, 30, 35};
+    
+    EXPECT_EQ(ordered_keys, expected);
+}
+
+TEST_F(BPlusTreeTest, DataPointersInCorrectOrder) {
+    BPlusTree tree(3);
+    
+    std::vector<int> keys = {30, 10, 20};
+    for (int key : keys) {
+        tree.insert(createData(key, "Data_" + std::to_string(key)));
+    }
+    
+    std::vector<Data*> data_list = tree.getAllDataInOrder();
+    ASSERT_EQ(data_list.size(), 3);
+    
+    EXPECT_EQ(data_list[0]->getRecordID(), 10);
+    EXPECT_EQ(data_list[1]->getRecordID(), 20);
+    EXPECT_EQ(data_list[2]->getRecordID(), 30);
+}
+
+TEST_F(BPlusTreeTest, LeafLinkedListTraversal) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 10; i++) {
+        tree.insert(createData(i, "Record " + std::to_string(i)));
+    }
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), 10);
+    
+    for (int i = 0; i < 10; i++) {
+        EXPECT_EQ(keys[i], i + 1);
+    }
+}
+
+// ============================================================================
+// SEARCH TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, SearchNonExistentKeyEmptyTree) {
+    BPlusTree tree(3);
+    EXPECT_EQ(tree.search(100), nullptr);
+}
+
+TEST_F(BPlusTreeTest, SearchNonExistentKeyInPopulatedTree) {
+    BPlusTree tree(3);
+    
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    tree.insert(createData(30, "Record 30"));
+    
+    EXPECT_EQ(tree.search(15), nullptr);
+    EXPECT_EQ(tree.search(5), nullptr);
+    EXPECT_EQ(tree.search(100), nullptr);
+    EXPECT_EQ(tree.search(25), nullptr);
+}
+
+TEST_F(BPlusTreeTest, SearchBoundaryKeys) {
+    BPlusTree tree(3);
+    
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    tree.insert(createData(30, "Record 30"));
+    
+    EXPECT_NE(tree.search(10), nullptr); // Smallest
+    EXPECT_NE(tree.search(30), nullptr); // Largest
+}
+
+// ============================================================================
+// SPLIT OPERATION TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, LeafSplitOrder3) {
+    BPlusTree tree(3);
+    
+    // Order 3: max 2 keys before split
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    
+    Node* root = tree.getRoot();
+    EXPECT_TRUE(root->isLeaf());
+    
+    tree.insert(createData(30, "Record 30")); // Triggers split
+    
+    // After split, root should be internal node
+    root = tree.getRoot();
+    EXPECT_FALSE(root->isLeaf());
+    
+    // All keys should still be searchable
+    EXPECT_NE(tree.search(10), nullptr);
+    EXPECT_NE(tree.search(20), nullptr);
+    EXPECT_NE(tree.search(30), nullptr);
+}
+
+TEST_F(BPlusTreeTest, MultipleSplits) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 10; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    // Verify all keys are searchable
+    for (int i = 1; i <= 10; i++) {
+        Data* found = tree.search(i * 10);
+        ASSERT_NE(found, nullptr) << "Key " << (i * 10) << " not found";
+        EXPECT_EQ(found->getRecordID(), i * 10);
+    }
+    
+    // Verify order is maintained
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    for (size_t i = 1; i < keys.size(); i++) {
+        EXPECT_LT(keys[i-1], keys[i]) << "Keys not in order at index " << i;
+    }
+}
+
+TEST_F(BPlusTreeTest, InternalNodeSplit) {
+    BPlusTree tree(3);
+    
+    // Insert enough elements to trigger internal node split
+    for (int i = 1; i <= 20; i++) {
+        tree.insert(createData(i, "Record " + std::to_string(i)));
+    }
+    
+    // Verify all are searchable
+    for (int i = 1; i <= 20; i++) {
+        EXPECT_NE(tree.search(i), nullptr) << "Key " << i << " not found";
+    }
+    
+    // Verify ordering
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), 20);
+    for (int i = 0; i < 20; i++) {
+        EXPECT_EQ(keys[i], i + 1);
+    }
+}
+
+// ============================================================================
+// LARGE DATASET TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, LargeDatasetSequential) {
+    BPlusTree tree(4);
+    const int num_records = 100;
+    
+    for (int i = 0; i < num_records; i++) {
+        tree.insert(createData(i, "Record " + std::to_string(i)));
+    }
+    
+    // Verify all insertions
+    for (int i = 0; i < num_records; i++) {
+        Data* found = tree.search(i);
+        ASSERT_NE(found, nullptr) << "Failed to find key " << i;
+        EXPECT_EQ(found->getRecordID(), i);
+    }
+    
+    // Verify order
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), num_records);
+    for (int i = 0; i < num_records; i++) {
+        EXPECT_EQ(keys[i], i);
+    }
+}
+
+TEST_F(BPlusTreeTest, LargeDatasetRandom) {
+    BPlusTree tree(5);
+    const int num_records = 100;
+    
+    std::vector<int> keys;
+    for (int i = 0; i < num_records; i++) {
+        keys.push_back(i);
+    }
     
     std::random_device rd;
-    std::mt19937 g(rd());
+    std::mt19937 g(42); // Fixed seed for reproducibility
     std::shuffle(keys.begin(), keys.end(), g);
     
     for (int key : keys) {
-        Data* d = new Data(key, "Record " + std::to_string(key));
-        test_data.push_back(d);
-        tree->insert(key, d);
+        tree.insert(createData(key, "Record " + std::to_string(key)));
     }
     
-    EXPECT_EQ(tree->size(), n);
-    
-    for (int i = 0; i < n; ++i) {
-        Data* result = tree->search(i);
-        ASSERT_NE(result, nullptr) << "Failed to find key: " << i;
-        EXPECT_EQ(result->getRecordID(), i);
-    }
-}
-
-// Range Query Tests
-TEST_F(BPlusTreeTestSmall, RangeQueryEmpty) {
-    auto results = tree->rangeQuery(0, 10);
-    EXPECT_EQ(results.size(), 0);
-}
-
-TEST_F(BPlusTreeTestSmall, RangeQuerySingleElement) {
-    Data* d = new Data(5, "Record 5");
-    test_data.push_back(d);
-    tree->insert(5, d);
-    
-    auto results = tree->rangeQuery(5, 5);
-    EXPECT_EQ(results.size(), 1);
-    EXPECT_EQ(results[0]->getRecordID(), 5);
-}
-
-TEST_F(BPlusTreeTestSmall, RangeQueryMultipleElements) {
-    for (int i = 0; i < 20; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
+    // Verify all insertions
+    for (int i = 0; i < num_records; i++) {
+        Data* found = tree.search(i);
+        ASSERT_NE(found, nullptr) << "Failed to find key " << i;
     }
     
-    auto results = tree->rangeQuery(5, 10);
-    EXPECT_EQ(results.size(), 6); // 5, 6, 7, 8, 9, 10
-    
-    for (size_t i = 0; i < results.size(); ++i) {
-        EXPECT_EQ(results[i]->getRecordID(), 5 + i);
+    // Verify sorted order
+    std::vector<int> ordered = tree.getAllKeysInOrder();
+    EXPECT_EQ(ordered.size(), num_records);
+    for (int i = 0; i < num_records; i++) {
+        EXPECT_EQ(ordered[i], i);
     }
 }
 
-TEST_F(BPlusTreeTestSmall, RangeQueryOutOfBounds) {
-    for (int i = 0; i < 10; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
-    }
-    
-    auto results = tree->rangeQuery(20, 30);
-    EXPECT_EQ(results.size(), 0);
-}
-
-TEST_F(BPlusTreeTestSmall, RangeQueryPartialOverlap) {
-    for (int i = 0; i < 10; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
-    }
-    
-    auto results = tree->rangeQuery(5, 15);
-    EXPECT_EQ(results.size(), 5); // 5, 6, 7, 8, 9
-}
-
-TEST_F(BPlusTreeTestSmall, RangeQueryFullRange) {
-    const int n = 20;
-    for (int i = 0; i < n; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
-    }
-    
-    auto results = tree->rangeQuery(0, n - 1);
-    EXPECT_EQ(results.size(), n);
-}
-
-// Stress Tests
-TEST_F(BPlusTreeTestMedium, StressTestLargeDataset) {
-    const int n = 10000;
-    for (int i = 0; i < n; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
-    }
-    
-    EXPECT_EQ(tree->size(), n);
-    
-    // Verify all elements
-    for (int i = 0; i < n; ++i) {
-        Data* result = tree->search(i);
-        ASSERT_NE(result, nullptr) << "Failed at key: " << i;
-        EXPECT_EQ(result->getRecordID(), i);
+TEST_F(BPlusTreeTest, StressTestVariousOrders) {
+    for (int order = 3; order <= 10; order++) {
+        BPlusTree tree(order);
+        
+        for (int i = 0; i < 50; i++) {
+            tree.insert(createData(i, "Record " + std::to_string(i)));
+        }
+        
+        for (int i = 0; i < 50; i++) {
+            ASSERT_NE(tree.search(i), nullptr) 
+                << "Order " << order << " failed to find key " << i;
+        }
+        
+        std::vector<int> keys = tree.getAllKeysInOrder();
+        EXPECT_EQ(keys.size(), 50) << "Order " << order << " has wrong number of keys";
     }
 }
 
-TEST_F(BPlusTreeTestMedium, StressTestRandomInsertAndSearch) {
-    const int n = 5000;
-    std::vector<int> keys(n);
-    for (int i = 0; i < n; ++i) keys[i] = i;
+// ============================================================================
+// EDGE CASE TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, NegativeKeys) {
+    BPlusTree tree(3);
     
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(keys.begin(), keys.end(), g);
+    tree.insert(createData(-10, "Record -10"));
+    tree.insert(createData(-5, "Record -5"));
+    tree.insert(createData(0, "Record 0"));
+    tree.insert(createData(5, "Record 5"));
     
-    for (int key : keys) {
-        Data* d = new Data(key, "Record " + std::to_string(key));
-        test_data.push_back(d);
-        tree->insert(key, d);
-    }
+    EXPECT_NE(tree.search(-10), nullptr);
+    EXPECT_NE(tree.search(-5), nullptr);
+    EXPECT_NE(tree.search(0), nullptr);
+    EXPECT_NE(tree.search(5), nullptr);
     
-    std::shuffle(keys.begin(), keys.end(), g);
-    
-    for (int key : keys) {
-        Data* result = tree->search(key);
-        ASSERT_NE(result, nullptr) << "Failed to find key: " << key;
-        EXPECT_EQ(result->getRecordID(), key);
-    }
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    std::vector<int> expected = {-10, -5, 0, 5};
+    EXPECT_EQ(keys, expected);
 }
 
-TEST_F(BPlusTreeTestLarge, PerformanceBenchmarkInsert) {
-    const int n = 100000;
+TEST_F(BPlusTreeTest, MixedPositiveNegativeKeys) {
+    BPlusTree tree(4);
     
-    auto start = std::chrono::high_resolution_clock::now();
-    
-    for (int i = 0; i < n; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
+    std::vector<int> input = {50, -30, 20, -10, 0, 40, -20, 10};
+    for (int key : input) {
+        tree.insert(createData(key, "Record " + std::to_string(key)));
     }
     
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    
-    EXPECT_EQ(tree->size(), n);
-    std::cout << "Inserted " << n << " elements in " << duration.count() << " ms" << std::endl;
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    std::vector<int> expected = {-30, -20, -10, 0, 10, 20, 40, 50};
+    EXPECT_EQ(keys, expected);
 }
 
-TEST_F(BPlusTreeTestLarge, PerformanceBenchmarkSearch) {
-    const int n = 100000;
+TEST_F(BPlusTreeTest, DuplicateKeysHandling) {
+    BPlusTree tree(3);
     
-    for (int i = 0; i < n; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
-    }
+    Data* d1 = createData(10, "First Record 10");
+    Data* d2 = createData(10, "Second Record 10");
+    Data* d3 = createData(20, "Record 20");
     
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::uniform_int_distribution<> dis(0, n - 1);
+    tree.insert(d1);
+    tree.insert(d2);
+    tree.insert(d3);
     
-    auto start = std::chrono::high_resolution_clock::now();
-    
-    const int num_searches = 10000;
-    for (int i = 0; i < num_searches; ++i) {
-        int key = dis(g);
-        Data* result = tree->search(key);
-        ASSERT_NE(result, nullptr);
-    }
-    
-    auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    
-    std::cout << "Performed " << num_searches << " random searches in " 
-              << duration.count() << " ms" << std::endl;
+    // Search should find one of the duplicate entries
+    Data* found = tree.search(10);
+    ASSERT_NE(found, nullptr);
+    EXPECT_EQ(found->getRecordID(), 10);
 }
 
-// Edge Cases
-TEST_F(BPlusTreeTestSmall, InsertDuplicateKeys) {
-    Data* d1 = new Data(1, "First");
-    Data* d2 = new Data(1, "Second");
-    test_data.push_back(d1);
-    test_data.push_back(d2);
+TEST_F(BPlusTreeTest, LargeKeyValues) {
+    BPlusTree tree(3);
     
-    tree->insert(1, d1);
-    tree->insert(1, d2);
+    tree.insert(createData(1000000, "Large 1"));
+    tree.insert(createData(2000000, "Large 2"));
+    tree.insert(createData(500000, "Large 3"));
     
-    // Note: This behavior depends on your implementation
-    // You may want to handle duplicates differently
-    EXPECT_EQ(tree->size(), 2);
+    EXPECT_NE(tree.search(1000000), nullptr);
+    EXPECT_NE(tree.search(2000000), nullptr);
+    EXPECT_NE(tree.search(500000), nullptr);
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys[0], 500000);
+    EXPECT_EQ(keys[1], 1000000);
+    EXPECT_EQ(keys[2], 2000000);
 }
 
-TEST_F(BPlusTreeTestSmall, EmptyTreeSearch) {
-    Data* result = tree->search(0);
-    EXPECT_EQ(result, nullptr);
-}
-
-TEST_F(BPlusTreeTestSmall, EmptyTreeRangeQuery) {
-    auto results = tree->rangeQuery(0, 100);
-    EXPECT_EQ(results.size(), 0);
-}
-
-TEST_F(BPlusTreeTestSmall, NegativeKeys) {
-    for (int i = -10; i < 10; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
-    }
+TEST_F(BPlusTreeTest, SingleKeyRepeatedSearch) {
+    BPlusTree tree(3);
+    Data* d = createData(42, "Answer");
+    tree.insert(d);
     
-    for (int i = -10; i < 10; ++i) {
-        Data* result = tree->search(i);
-        ASSERT_NE(result, nullptr);
-        EXPECT_EQ(result->getRecordID(), i);
+    for (int i = 0; i < 100; i++) {
+        Data* found = tree.search(42);
+        ASSERT_NE(found, nullptr);
+        EXPECT_EQ(found->getData(), "Answer");
     }
 }
 
-TEST_F(BPlusTreeTestSmall, RangeQueryWithNegativeKeys) {
-    for (int i = -10; i < 10; ++i) {
-        Data* d = new Data(i, "Record " + std::to_string(i));
-        test_data.push_back(d);
-        tree->insert(i, d);
+// ============================================================================
+// DATA INTEGRITY TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, DataIntegrityAfterMultipleSplits) {
+    BPlusTree tree(3);
+    
+    std::vector<std::pair<int, std::string>> test_cases = {
+        {5, "Alpha"}, {15, "Beta"}, {25, "Gamma"}, {35, "Delta"},
+        {10, "Epsilon"}, {20, "Zeta"}, {30, "Eta"}, {40, "Theta"}
+    };
+    
+    for (const auto& tc : test_cases) {
+        tree.insert(createData(tc.first, tc.second));
     }
     
-    auto results = tree->rangeQuery(-5, 5);
-    EXPECT_EQ(results.size(), 11); // -5 to 5 inclusive
+    for (const auto& tc : test_cases) {
+        Data* found = tree.search(tc.first);
+        ASSERT_NE(found, nullptr) << "Key " << tc.first << " not found";
+        EXPECT_EQ(found->getData(), tc.second);
+    }
 }
 
-// Main function
-int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+TEST_F(BPlusTreeTest, PointerConsistencyInLeafNodes) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 20; i++) {
+        Data* d = createData(i, "Data_" + std::to_string(i));
+        tree.insert(d);
+    }
+    
+    std::vector<Data*> data_list = tree.getAllDataInOrder();
+    
+    for (size_t i = 0; i < data_list.size(); i++) {
+        EXPECT_EQ(data_list[i]->getRecordID(), static_cast<int>(i + 1));
+        EXPECT_EQ(data_list[i]->getData(), "Data_" + std::to_string(i + 1));
+    }
+}
+
+// ============================================================================
+// BASIC DELETE TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, DeleteFromEmptyTree) {
+    BPlusTree tree(3);
+    EXPECT_FALSE(tree.remove(10));
+    EXPECT_TRUE(tree.isEmpty());
+}
+
+TEST_F(BPlusTreeTest, DeleteNonExistentKey) {
+    BPlusTree tree(3);
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    
+    EXPECT_FALSE(tree.remove(15));
+    EXPECT_FALSE(tree.remove(5));
+    EXPECT_FALSE(tree.remove(100));
+}
+
+TEST_F(BPlusTreeTest, DeleteSingleElementTree) {
+    BPlusTree tree(3);
+    tree.insert(createData(10, "Record 10"));
+
+    tree.printTree();    
+
+    EXPECT_TRUE(tree.remove(10));
+    EXPECT_TRUE(tree.isEmpty());
+    EXPECT_EQ(tree.search(10), nullptr);
+}
+
+TEST_F(BPlusTreeTest, DeleteAndVerifyRemoval) {
+    BPlusTree tree(3);
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    tree.insert(createData(30, "Record 30"));
+    
+    EXPECT_TRUE(tree.remove(20));
+    EXPECT_EQ(tree.search(20), nullptr);
+    EXPECT_NE(tree.search(10), nullptr);
+    EXPECT_NE(tree.search(30), nullptr);
+}
+
+TEST_F(BPlusTreeTest, DeleteFirstKey) {
+    BPlusTree tree(3);
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    tree.insert(createData(30, "Record 30"));
+    
+    EXPECT_TRUE(tree.remove(10));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    std::vector<int> expected = {20, 30};
+    EXPECT_EQ(keys, expected);
+}
+
+TEST_F(BPlusTreeTest, DeleteLastKey) {
+    BPlusTree tree(3);
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    tree.insert(createData(30, "Record 30"));
+    
+    EXPECT_TRUE(tree.remove(30));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    std::vector<int> expected = {10, 20};
+    EXPECT_EQ(keys, expected);
+}
+
+TEST_F(BPlusTreeTest, DeleteMiddleKey) {
+    BPlusTree tree(3);
+    tree.insert(createData(10, "Record 10"));
+    tree.insert(createData(20, "Record 20"));
+    tree.insert(createData(30, "Record 30"));
+    
+    EXPECT_TRUE(tree.remove(20));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    std::vector<int> expected = {10, 30};
+    EXPECT_EQ(keys, expected);
+}
+
+// ============================================================================
+// MULTIPLE DELETE TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, DeleteAllKeysSequentially) {
+    BPlusTree tree(3);
+    std::vector<int> keys_to_insert = {10, 20, 30, 40, 50};
+    
+    for (int key : keys_to_insert) {
+        tree.insert(createData(key, "Record " + std::to_string(key)));
+    }
+    
+    for (int key : keys_to_insert) {
+        EXPECT_TRUE(tree.remove(key));
+        EXPECT_EQ(tree.search(key), nullptr);
+    }
+    
+    EXPECT_TRUE(tree.isEmpty());
+}
+
+TEST_F(BPlusTreeTest, DeleteAllKeysReverseOrder) {
+    BPlusTree tree(3);
+    std::vector<int> keys_to_insert = {10, 20, 30, 40, 50};
+    
+    for (int key : keys_to_insert) {
+        tree.insert(createData(key, "Record " + std::to_string(key)));
+    }
+    
+    for (auto it = keys_to_insert.rbegin(); it != keys_to_insert.rend(); ++it) {
+        EXPECT_TRUE(tree.remove(*it));
+        EXPECT_EQ(tree.search(*it), nullptr);
+    }
+    
+    EXPECT_TRUE(tree.isEmpty());
+}
+
+TEST_F(BPlusTreeTest, DeleteAlternatingKeys) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 10; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    // Delete even-indexed keys
+    for (int i = 2; i <= 10; i += 2) {
+        EXPECT_TRUE(tree.remove(i * 10));
+    }
+    
+    // Verify odd-indexed keys remain
+    for (int i = 1; i <= 10; i++) {
+        if (i % 2 == 0) {
+            EXPECT_EQ(tree.search(i * 10), nullptr);
+        } else {
+            EXPECT_NE(tree.search(i * 10), nullptr);
+        }
+    }
+}
+
+// ============================================================================
+// UNDERFLOW AND REBALANCING TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, LeafBorrowFromLeftSibling) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 5; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    // This should trigger borrowing from left sibling
+    EXPECT_TRUE(tree.remove(40));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), 4);
+    
+    // All remaining keys should be searchable
+    EXPECT_NE(tree.search(10), nullptr);
+    EXPECT_NE(tree.search(20), nullptr);
+    EXPECT_NE(tree.search(30), nullptr);
+    EXPECT_NE(tree.search(50), nullptr);
+}
+
+TEST_F(BPlusTreeTest, LeafBorrowFromRightSibling) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 5; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    // This should trigger borrowing from right sibling
+    EXPECT_TRUE(tree.remove(20));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), 4);
+    
+    EXPECT_NE(tree.search(10), nullptr);
+    EXPECT_NE(tree.search(30), nullptr);
+    EXPECT_NE(tree.search(40), nullptr);
+    EXPECT_NE(tree.search(50), nullptr);
+}
+
+TEST_F(BPlusTreeTest, LeafMergeWithSibling) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 7; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    // Delete keys that will cause merging
+    EXPECT_TRUE(tree.remove(30));
+    EXPECT_TRUE(tree.remove(40));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), 5);
+    
+    // Verify ordering is maintained
+    for (size_t i = 1; i < keys.size(); i++) {
+        EXPECT_LT(keys[i-1], keys[i]);
+    }
+}
+
+TEST_F(BPlusTreeTest, InternalNodeMerge) {
+    BPlusTree tree(3);
+    
+    // Insert enough to create multi-level tree
+    for (int i = 1; i <= 15; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    // Delete multiple keys to trigger internal node merge
+    for (int i = 1; i <= 8; i++) {
+        EXPECT_TRUE(tree.remove(i * 10));
+    }
+    
+    // Verify remaining keys
+    for (int i = 9; i <= 15; i++) {
+        EXPECT_NE(tree.search(i * 10), nullptr) 
+            << "Key " << (i * 10) << " should exist";
+    }
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    EXPECT_EQ(keys.size(), 7);
+}
+
+TEST_F(BPlusTreeTest, RootReduction) {
+    BPlusTree tree(3);
+    
+    // Create a tree with multiple levels
+    for (int i = 1; i <= 10; i++) {
+        tree.insert(createData(i * 10, "Record " + std::to_string(i * 10)));
+    }
+    
+    Node* root_before = tree.getRoot();
+    EXPECT_FALSE(root_before->isLeaf());
+    
+    // Delete keys to reduce tree height
+    for (int i = 1; i <= 7; i++) {
+        EXPECT_TRUE(tree.remove(i * 10));
+    }
+    
+    // Remaining keys should still be accessible
+    for (int i = 8; i <= 10; i++) {
+        EXPECT_NE(tree.search(i * 10), nullptr);
+    }
+}
+
+// ============================================================================
+// ORDERING PRESERVATION TESTS
+// ============================================================================
+
+TEST_F(BPlusTreeTest, OrderPreservedAfterDeletes) {
+    BPlusTree tree(3);
+    
+    std::vector<int> insert_order = {50, 20, 70, 10, 30, 60, 80, 5, 15, 25};
+    for (int key : insert_order) {
+        tree.insert(createData(key, "Record " + std::to_string(key)));
+    }
+    
+    // Delete some keys
+    EXPECT_TRUE(tree.remove(20));
+    EXPECT_TRUE(tree.remove(60));
+    EXPECT_TRUE(tree.remove(5));
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    
+    // Verify remaining keys are in sorted order
+    for (size_t i = 1; i < keys.size(); i++) {
+        EXPECT_LT(keys[i-1], keys[i]) << "Keys not in order at index " << i;
+    }
+}
+
+TEST_F(BPlusTreeTest, LeafLinkedListIntegrityAfterDelete) {
+    BPlusTree tree(3);
+    
+    for (int i = 1; i <= 20; i++) {
+        tree.insert(createData(i, "Record " + std::to_string(i)));
+    }
+    
+    // Delete multiple keys
+    for (int i = 5; i <= 15; i += 2) {
+        EXPECT_TRUE(tree.remove(i));
+    }
+    
+    std::vector<int> keys = tree.getAllKeysInOrder();
+    
+    // Verify all keys are in ascending order
+    for (size_t i = 1; i < keys.size(); i++) {
+        EXPECT_LT(keys[i-1], keys[i]);
+    }
+    
+    // Verify correct number of keys
+    EXPECT_EQ(keys.size(), 14);
 }

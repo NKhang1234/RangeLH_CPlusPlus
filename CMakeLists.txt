@@ -69,23 +69,20 @@ gtest_discover_tests(rangeLH_test)
 # 6. B+ Tree Indexing
 # ---------------------------------------------------
 # Define an INTERFACE library for header-only templates
-add_library(BPlusTree_lib INTERFACE)
-
-# Tell the library where its headers are located
-target_include_directories(BPlusTree_lib INTERFACE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/BPlusTree
+add_library(bPlusTree_lib 
+    BPlusTree/bPlusTree.cpp
 )
 
 # Create the test executable
 add_executable(bPlusTree_test UnitTest/bPlusTree_test.cpp)
+
 # Link the test to its library and GTest
 target_link_libraries(bPlusTree_test 
-    BPlusTree_lib 
+    bPlusTree_lib 
     GTest::gtest_main 
     pthread
 )
 gtest_discover_tests(bPlusTree_test)
-
 # Configure: cmake ..
 # Build: make
 
