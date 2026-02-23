@@ -29,9 +29,9 @@ public:
     ~RangeLH();
 
     // Core functions
-    bool insert(uint64_t key, const Data& value);
-    bool insert(double key, const Data& value);
-    bool insert(const std::string& key, const Data& value);
+    bool insert(uint64_t key, const Data* value);
+    bool insert(double key, const Data* value);
+    bool insert(const std::string& key, const Data* value);
     
     std::optional<const Data*> point_lookup(uint64_t key);
     std::optional<const Data*> point_lookup(double key);
@@ -62,7 +62,7 @@ private:
     std::vector<std::pair<uint64_t, int>> get_right_children_list(uint64_t cur_key, int cur_level, uint64_t worker_key);
     
     // Internal implementation
-    bool insert_impl(uint64_t key, const Data& value);
+    bool insert_impl(uint64_t key, const Data* value);
     std::optional<const Data*> point_lookup_impl(uint64_t key);
     std::optional<std::vector<const Data*>> range_lookup_impl(uint64_t key_start, uint64_t key_end);
     bool remove_impl(uint64_t key);

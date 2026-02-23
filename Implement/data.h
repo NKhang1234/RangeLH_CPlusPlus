@@ -11,7 +11,7 @@ private:
 public:
     Data(int id, const std::string& data) : record_id(id), data(data) {}
     inline int getRecordID() const { return record_id; }
-    inline std::string getData() const { return data; }
+    inline const std::string& getData() const { return data; }
 };
 
 #endif // DATA_H

@@ -378,8 +378,7 @@ void BPlusTree::handleUnderflow(Node* node) {
 }
 
 // Insert a data pointer
-void BPlusTree::insert(Data* data) {
-    int key = data->getRecordID();
+void BPlusTree::insert(int key, Data* data) {
     count += 1;
     
     if (!root) {

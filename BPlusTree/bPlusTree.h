@@ -113,7 +113,7 @@ public:
     }
     
     // Insert a data pointer
-    void insert(Data* data);
+    void insert(int key, Data* data);
 
     // Search for data by key
     Data* search(int key);

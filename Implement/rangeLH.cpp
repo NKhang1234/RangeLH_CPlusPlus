@@ -190,16 +190,16 @@ void RangeLH::print_worker_chain() {
 // Core Functions - Implementation
 // ============================================================
 
-bool RangeLH::insert_impl(uint64_t key, const Data& value) {
+bool RangeLH::insert_impl(uint64_t key, const Data* value) {
     uint64_t worker_key = key;
 
     Worker* existed_worker = master_LH->lookup(worker_key);
     if (existed_worker != nullptr) {
-        return existed_worker->updateData(&value);
+        return existed_worker->updateData(value);
     }
     
     // Create new worker
-    Worker* new_worker = new Worker(worker_key, &value);
+    Worker* new_worker = new Worker(worker_key, value);
     
     // Connect with adjacent workers
     Worker* prev_worker = get_left_adjacent_worker(worker_key);
@@ -276,15 +276,15 @@ bool RangeLH::remove_impl(uint64_t key) {
 // Public Interface - Type Overloads
 // ============================================================
 
-bool RangeLH::insert(uint64_t key, const Data& value) {
+bool RangeLH::insert(uint64_t key, const Data* value) {
     return insert_impl(key, value);
 }
 
-bool RangeLH::insert(double key, const Data& value) {
+bool RangeLH::insert(double key, const Data* value) {
     return insert_impl(float_to_scaled_int(key), value);
 }
 
-bool RangeLH::insert(const std::string& key, const Data& value) {
+bool RangeLH::insert(const std::string& key, const Data* value) {
     return insert_impl(string_to_int_lex(key), value);
 }
 

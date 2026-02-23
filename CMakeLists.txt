@@ -83,6 +83,33 @@ target_link_libraries(bPlusTree_test
     pthread
 )
 gtest_discover_tests(bPlusTree_test)
+
+# ---------------------------------------------------
+# 7. Benchmark Section
+# ---------------------------------------------------
+
+# Find Google Benchmark
+find_package(benchmark REQUIRED)
+
+# Benchmark executable
+add_executable(index_benchmark
+    Benchmark/benchmark.cpp
+)
+
+# Link all indexing libraries
+target_link_libraries(index_benchmark
+    RangeLH_lib
+    bPlusTree_lib
+    benchmark::benchmark
+    pthread
+)
+
+# Ensure optimized build for benchmarking
+target_compile_options(index_benchmark PRIVATE -O3 -march=native)
+
+
+
+
 # Configure: cmake ..
 # Build: make
 
@@ -94,3 +121,4 @@ gtest_discover_tests(bPlusTree_test)
 # ./linearHashing_test
 # ./rangeLH_test
 # ./bPlusTree_test
+# ./index_benchmark

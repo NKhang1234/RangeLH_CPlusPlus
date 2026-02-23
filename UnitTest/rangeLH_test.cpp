@@ -37,7 +37,7 @@ TEST_F(RangeLHTest, InsertAndPointLookupUint64) {
     Data* d1 = new Data{100, "10"};
     test_data.push_back(d1);
 
-    EXPECT_TRUE(index->insert(static_cast<uint64_t>(100ULL), *d1));
+    EXPECT_TRUE(index->insert(static_cast<uint64_t>(100ULL), d1));
 
     auto res = index->point_lookup(static_cast<uint64_t>(100ULL));
     ASSERT_TRUE(res.has_value());
@@ -54,8 +54,8 @@ TEST_F(RangeLHTest, InsertUpdatesExistingKey) {
     test_data.push_back(d1);
     test_data.push_back(d2);
 
-    EXPECT_TRUE(index->insert(static_cast<uint64_t>(42ULL), *d1));
-    EXPECT_TRUE(index->insert(static_cast<uint64_t>(42ULL), *d2)); // update
+    EXPECT_TRUE(index->insert(static_cast<uint64_t>(42ULL), d1));
+    EXPECT_TRUE(index->insert(static_cast<uint64_t>(42ULL), d2)); // update
 
     auto res = index->point_lookup(static_cast<uint64_t>(42ULL));
     ASSERT_TRUE(res.has_value());
@@ -81,9 +81,9 @@ TEST_F(RangeLHTest, RangeLookupBasic) {
     test_data.push_back(d2);
     test_data.push_back(d3);
 
-    index->insert(static_cast<uint64_t>(10ULL), *d1);
-    index->insert(static_cast<uint64_t>(20ULL), *d2);
-    index->insert(static_cast<uint64_t>(30ULL), *d3);
+    index->insert(static_cast<uint64_t>(10ULL), d1);
+    index->insert(static_cast<uint64_t>(20ULL), d2);
+    index->insert(static_cast<uint64_t>(30ULL), d3);
 
     // index->print_worker_chain();
 
@@ -107,9 +107,9 @@ TEST_F(RangeLHTest, RangeLookupPartial) {
     test_data.push_back(d2);
     test_data.push_back(d3);
 
-    index->insert(static_cast<uint64_t>(10ULL), *d1);
-    index->insert(static_cast<uint64_t>(20ULL), *d2);
-    index->insert(static_cast<uint64_t>(30ULL), *d3);
+    index->insert(static_cast<uint64_t>(10ULL), d1);
+    index->insert(static_cast<uint64_t>(20ULL), d2);
+    index->insert(static_cast<uint64_t>(30ULL), d3);
     auto res = index->range_lookup(static_cast<uint64_t>(15ULL), static_cast<uint64_t>(25ULL));
     ASSERT_TRUE(res.has_value());
     ASSERT_EQ(res->size(), 1);
@@ -123,7 +123,7 @@ TEST_F(RangeLHTest, RangeLookupEmpty) {
     Data* d1 = new Data{1, "1"};
     test_data.push_back(d1);
 
-    index->insert(static_cast<uint64_t>(10ULL), *d1);
+    index->insert(static_cast<uint64_t>(10ULL), d1);
 
     auto res = index->range_lookup(static_cast<uint64_t>(20ULL), static_cast<uint64_t>(30ULL));
     EXPECT_FALSE(res.has_value());
@@ -137,7 +137,7 @@ TEST_F(RangeLHTest, StringKeyInsertLookup) {
     Data* d1 = new Data{100, "100"};
     test_data.push_back(d1);
 
-    EXPECT_TRUE(index->insert(std::string("apple"), *d1));
+    EXPECT_TRUE(index->insert(std::string("apple"), d1));
 
     auto res = index->point_lookup(std::string("apple"));
     ASSERT_TRUE(res.has_value());
@@ -202,8 +202,8 @@ TEST_F(RangeLHTest, FloatKeyInsertRange) {
     test_data.push_back(d1);
     test_data.push_back(d2);
 
-    index->insert(1.5, *d1);
-    index->insert(2.5, *d2);
+    index->insert(1.5, d1);
+    index->insert(2.5, d2);
 
     auto res = index->range_lookup(1.0, 2.0);
     ASSERT_TRUE(res.has_value());
@@ -219,7 +219,7 @@ TEST_F(RangeLHTest, RemoveKey) {
     Data* d1 = new Data{10, "10"};
     test_data.push_back(d1);
 
-    index->insert(static_cast<uint64_t>(50ULL), *d1);
+    index->insert(static_cast<uint64_t>(50ULL), d1);
     EXPECT_TRUE(index->remove(static_cast<uint64_t>(50ULL)));
 
     auto res = index->point_lookup(static_cast<uint64_t>(50ULL));
