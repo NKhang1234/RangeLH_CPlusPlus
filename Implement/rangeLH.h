@@ -19,7 +19,9 @@ private:
     int max_bytes_string;
     int float_scale;
     int delta_bloom_RF;
+
     Worker* worker_head;
+    Worker* worker_tail;
 
 public:
     RangeLH(int master_init_num_bucket, double master_split_policy,
@@ -36,6 +38,10 @@ public:
     std::optional<const Data*> point_lookup(uint64_t key);
     std::optional<const Data*> point_lookup(double key);
     std::optional<const Data*> point_lookup(const std::string& key);
+
+    std::optional<const Data*> get_head();
+    std::optional<const Data*> get_tail();
+    int get_num_worker() const { return num_worker; }
 
     std::optional<std::vector<const Data*>> range_lookup(uint64_t key_start, uint64_t key_end);
     std::optional<std::vector<const Data*>> range_lookup(double key_start, double key_end);

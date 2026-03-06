@@ -18,8 +18,8 @@ RangeLH::RangeLH(int master_init_num_bucket, double master_split_policy,
       max_bytes_string(max_bytes_string),
       float_scale(float_scale),
       delta_bloom_RF(delta_bloom_RF),
-      worker_head(nullptr) {
-    
+      worker_head(nullptr),
+      worker_tail(nullptr) {
     // Initialize master_LH and bloom_RF
         master_LH = std::make_unique<LinearHashing>(master_init_num_bucket, master_split_policy);
         bloom_RF = std::make_unique<BloomRF>(expected_n_items, fp_prob_bloom_RF, key_length, delta_bloom_RF);
@@ -195,6 +195,9 @@ bool RangeLH::insert_impl(uint64_t key, const Data* value) {
 
     Worker* existed_worker = master_LH->lookup(worker_key);
     if (existed_worker != nullptr) {
+        if (!existed_worker->hasData()) {
+            num_worker++;
+        }
         return existed_worker->updateData(value);
     }
     
@@ -209,11 +212,14 @@ bool RangeLH::insert_impl(uint64_t key, const Data* value) {
         prev_worker->setNext(new_worker);
         if (next_worker != nullptr) {
             new_worker->setNext(next_worker);
+        } else {
+            worker_tail = new_worker;
         }
     }
     else {
         new_worker->setNext(worker_head);
         worker_head = new_worker;
+        worker_tail = (worker_tail == nullptr) ? new_worker : worker_tail;
     }
     
     master_LH->insert(worker_key, new_worker);
@@ -229,6 +235,20 @@ std::optional<const Data*> RangeLH::point_lookup_impl(uint64_t key) {
     
     if (worker_ptr != nullptr and worker_ptr->hasData()) {
         return worker_ptr->getData();
+    }
+    return std::nullopt;
+}
+
+std::optional<const Data*> RangeLH::get_head() {
+    if (worker_head != nullptr && worker_head->hasData()) {
+        return worker_head->getData();
+    }
+    return std::nullopt;
+}
+
+std::optional<const Data*> RangeLH::get_tail() {
+    if (worker_tail != nullptr && worker_tail->hasData()) {
+        return worker_tail->getData();
     }
     return std::nullopt;
 }
@@ -269,6 +289,8 @@ bool RangeLH::remove_impl(uint64_t key) {
     if (worker_ptr != nullptr) {
         return worker_ptr->deleteData();
     }
+
+    --num_worker;
     return false;
 }
 

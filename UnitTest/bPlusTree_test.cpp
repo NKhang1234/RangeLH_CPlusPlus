@@ -69,7 +69,7 @@ TEST_F(BPlusTreeTest, SingleInsertion) {
     
     Data* found = tree.search(10);
     ASSERT_NE(found, nullptr);
-    EXPECT_EQ(found->getRecordID(), 10);
+    EXPECT_EQ(found->getKey(), 10);
     EXPECT_EQ(found->getData(), "Record 10");
 }
 
@@ -98,7 +98,7 @@ TEST_F(BPlusTreeTest, MultipleInsertionsAscending) {
     for (int i = 1; i <= 5; i++) {
         Data* found = tree.search(i * 10);
         ASSERT_NE(found, nullptr);
-        EXPECT_EQ(found->getRecordID(), i * 10);
+        EXPECT_EQ(found->getKey(), i * 10);
         EXPECT_EQ(found->getData(), "Record " + std::to_string(i * 10));
     }
 }
@@ -113,7 +113,7 @@ TEST_F(BPlusTreeTest, MultipleInsertionsDescending) {
     for (int i = 1; i <= 5; i++) {
         Data* found = tree.search(i * 10);
         ASSERT_NE(found, nullptr);
-        EXPECT_EQ(found->getRecordID(), i * 10);
+        EXPECT_EQ(found->getKey(), i * 10);
     }
 }
 
@@ -128,7 +128,7 @@ TEST_F(BPlusTreeTest, MultipleInsertionsRandom) {
     for (int key : keys) {
         Data* found = tree.search(key);
         ASSERT_NE(found, nullptr);
-        EXPECT_EQ(found->getRecordID(), key);
+        EXPECT_EQ(found->getKey(), key);
     }
 }
 
@@ -161,9 +161,9 @@ TEST_F(BPlusTreeTest, DataPointersInCorrectOrder) {
     std::vector<Data*> data_list = tree.getAllDataInOrder();
     ASSERT_EQ(data_list.size(), 3);
     
-    EXPECT_EQ(data_list[0]->getRecordID(), 10);
-    EXPECT_EQ(data_list[1]->getRecordID(), 20);
-    EXPECT_EQ(data_list[2]->getRecordID(), 30);
+    EXPECT_EQ(data_list[0]->getKey(), 10);
+    EXPECT_EQ(data_list[1]->getKey(), 20);
+    EXPECT_EQ(data_list[2]->getKey(), 30);
 }
 
 TEST_F(BPlusTreeTest, LeafLinkedListTraversal) {
@@ -251,7 +251,7 @@ TEST_F(BPlusTreeTest, MultipleSplits) {
     for (int i = 1; i <= 10; i++) {
         Data* found = tree.search(i * 10);
         ASSERT_NE(found, nullptr) << "Key " << (i * 10) << " not found";
-        EXPECT_EQ(found->getRecordID(), i * 10);
+        EXPECT_EQ(found->getKey(), i * 10);
     }
     
     // Verify order is maintained
@@ -298,7 +298,7 @@ TEST_F(BPlusTreeTest, LargeDatasetSequential) {
     for (int i = 0; i < num_records; i++) {
         Data* found = tree.search(i);
         ASSERT_NE(found, nullptr) << "Failed to find key " << i;
-        EXPECT_EQ(found->getRecordID(), i);
+        EXPECT_EQ(found->getKey(), i);
     }
     
     // Verify order
@@ -407,7 +407,7 @@ TEST_F(BPlusTreeTest, DuplicateKeysHandling) {
     // Search should find one of the duplicate entries
     Data* found = tree.search(10);
     ASSERT_NE(found, nullptr);
-    EXPECT_EQ(found->getRecordID(), 10);
+    EXPECT_EQ(found->getKey(), 10);
 }
 
 TEST_F(BPlusTreeTest, LargeKeyValues) {
@@ -473,7 +473,7 @@ TEST_F(BPlusTreeTest, PointerConsistencyInLeafNodes) {
     std::vector<Data*> data_list = tree.getAllDataInOrder();
     
     for (size_t i = 0; i < data_list.size(); i++) {
-        EXPECT_EQ(data_list[i]->getRecordID(), static_cast<int>(i + 1));
+        EXPECT_EQ(data_list[i]->getKey(), static_cast<int>(i + 1));
         EXPECT_EQ(data_list[i]->getData(), "Data_" + std::to_string(i + 1));
     }
 }

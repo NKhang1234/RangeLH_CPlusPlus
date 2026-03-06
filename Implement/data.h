@@ -6,11 +6,11 @@
 
 class Data {
 private:
-    int record_id;
+    uint64_t key;
     std::string data;
 public:
-    Data(int id, const std::string& data) : record_id(id), data(data) {}
-    inline int getRecordID() const { return record_id; }
+    Data(uint64_t key, const std::string& data) : key(key), data(data) {}
+    inline uint64_t getKey() const { return key; }
     inline const std::string& getData() const { return data; }
 };
 
