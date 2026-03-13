@@ -1,4 +1,4 @@
-#include "indexing.h"
+#include "storage.h"
 #include <limits>
 
 Storage::Storage(
@@ -23,13 +23,18 @@ Storage::Storage(
 )
 {}
 
-bool Storage::insert(uint64_t key, int record_id, const std::string& data)
+bool Storage::insert(uint64_t key, const std::string& data)
 {
-    data_pool.emplace_back(record_id, data);
+    data_pool.emplace_back(key, data);
 
     Data* record = &data_pool.back();
 
     return index.insert(key, record);
+}
+
+bool Storage::remove(uint64_t key)
+{
+    return index.remove(key);
 }
 
 std::optional<Data> Storage::get(uint64_t key)
@@ -44,7 +49,7 @@ std::optional<Data> Storage::get(uint64_t key)
     return *record;
 }
 
-double Storage::sum(uint64_t start, uint64_t end)
+double Storage::sumRange(uint64_t start, uint64_t end)
 {
     auto results = index.range_lookup(start, end);
 
@@ -59,7 +64,7 @@ double Storage::sum(uint64_t start, uint64_t end)
     return total;
 }
 
-double Storage::avg(uint64_t start, uint64_t end)
+double Storage::avgRange(uint64_t start, uint64_t end)
 {
     auto results = index.range_lookup(start, end);
 
@@ -90,6 +95,32 @@ double Storage::minRange(uint64_t start, uint64_t end)
     return min_val;
 }
 
+double Storage::maxRange(uint64_t start, uint64_t end)
+{
+    auto results = index.range_lookup(start, end);
+
+    if (!results || results->empty())
+        return -std::numeric_limits<double>::infinity();
+
+    double max_val = (*results)[0]->getKey();
+
+    for (const Data* d : *results)
+        if (d->getKey() > max_val)
+            max_val = d->getKey();
+
+    return max_val;
+}
+
+int Storage::countRange(uint64_t start, uint64_t end)
+{
+    auto results = index.range_lookup(start, end);
+
+    if (!results)
+        return 0;
+
+    return results->size();
+}
+
 double Storage::min() {
     auto head_opt = index.get_head();
     if (!head_opt)
@@ -106,18 +137,20 @@ double Storage::max() {
     return (*tail_opt)->getKey();
 }
 
-double Storage::maxRange(uint64_t start, uint64_t end)
-{
-    auto results = index.range_lookup(start, end);
+double Storage::sum() {
+    return index.get_sum_keys();
+}
 
-    if (!results || results->empty())
-        return -std::numeric_limits<double>::infinity();
+double Storage::avg() {
+    double sum_keys = index.get_sum_keys();
+    int count = index.get_num_active_worker();
 
-    double max_val = (*results)[0]->getKey();
+    if(count == 0) {
+        return 0.0;
+    }
+    return sum_keys / count;
+}
 
-    for (const Data* d : *results)
-        if (d->getKey() > max_val)
-            max_val = d->getKey();
-
-    return max_val;
+int Storage::count() {
+    return index.get_num_active_worker();
 }

@@ -24,21 +24,27 @@ public:
     ~Storage() = default;
 
     // insert a record
-    bool insert(uint64_t key, int record_id, const std::string& data);
+    bool insert(uint64_t key, const std::string& data);
+
+    // delete a record
+    bool remove(uint64_t key);
 
     // point lookup
     std::optional<Data> get(uint64_t key);
 
-    // aggregation
+    // aggregation with range
     double minRange(uint64_t start, uint64_t end);
     double maxRange(uint64_t start, uint64_t end);
+    double sumRange(uint64_t start, uint64_t end);
+    double avgRange(uint64_t start, uint64_t end);
+    int countRange(uint64_t start, uint64_t end);
 
     // Aggregate over the entire range
     double min(); 
     double max();
-
-    double sum(uint64_t start, uint64_t end);
-    double avg(uint64_t start, uint64_t end);
+    double sum();
+    double avg();
+    int count();
 
 private:
 

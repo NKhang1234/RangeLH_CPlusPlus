@@ -13,7 +13,7 @@
 RangeLH::RangeLH(int master_init_num_bucket, double master_split_policy,
                  int expected_n_items, double fp_prob_bloom_RF, int delta_bloom_RF, int key_length,
                 int max_bytes_string, int float_scale)
-    : num_worker(0),
+    : num_active_worker(0),
       key_length(key_length),
       max_bytes_string(max_bytes_string),
       float_scale(float_scale),
@@ -196,7 +196,7 @@ bool RangeLH::insert_impl(uint64_t key, const Data* value) {
     Worker* existed_worker = master_LH->lookup(worker_key);
     if (existed_worker != nullptr) {
         if (!existed_worker->hasData()) {
-            num_worker++;
+            num_active_worker++;
         }
         return existed_worker->updateData(value);
     }
@@ -224,7 +224,7 @@ bool RangeLH::insert_impl(uint64_t key, const Data* value) {
     
     master_LH->insert(worker_key, new_worker);
     bloom_RF->insert(worker_key);
-    ++num_worker;
+    ++num_active_worker;
     
     return true;
 }
@@ -251,6 +251,18 @@ std::optional<const Data*> RangeLH::get_tail() {
         return worker_tail->getData();
     }
     return std::nullopt;
+}
+
+double RangeLH::get_sum_keys() {
+    double total_sum = 0.0;
+    Worker* current = worker_head;
+    while (current != nullptr) {
+        if (current->hasData()) {
+            total_sum += current->getData()->getKey();
+        }
+        current = current->getNext();
+    }
+    return total_sum;
 }
 
 std::optional<std::vector<const Data*>> RangeLH::range_lookup_impl(uint64_t key_start, uint64_t key_end) {
@@ -290,7 +302,7 @@ bool RangeLH::remove_impl(uint64_t key) {
         return worker_ptr->deleteData();
     }
 
-    --num_worker;
+    --num_active_worker;
     return false;
 }
 

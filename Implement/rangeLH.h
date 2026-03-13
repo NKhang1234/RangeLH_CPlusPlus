@@ -14,7 +14,7 @@ private:
     std::unique_ptr<LinearHashing> master_LH;
     std::unique_ptr<BloomRF> bloom_RF;
     
-    int num_worker;
+    int num_active_worker;
     int key_length;
     int max_bytes_string;
     int float_scale;
@@ -41,7 +41,8 @@ public:
 
     std::optional<const Data*> get_head();
     std::optional<const Data*> get_tail();
-    int get_num_worker() const { return num_worker; }
+    int get_num_active_worker() const { return num_active_worker; }
+    double get_sum_keys();
 
     std::optional<std::vector<const Data*>> range_lookup(uint64_t key_start, uint64_t key_end);
     std::optional<std::vector<const Data*>> range_lookup(double key_start, double key_end);

@@ -85,7 +85,34 @@ target_link_libraries(bPlusTree_test
 gtest_discover_tests(bPlusTree_test)
 
 # ---------------------------------------------------
-# 7. Benchmark Section
+# 7. Storage Layer
+# ---------------------------------------------------
+
+# Create library for Storage logic
+add_library(Storage_lib
+    Implement/storage.cpp
+    Implement/rangeLH.cpp
+    Implement/linearHashing.cpp
+    Implement/bloomRF.cpp
+)
+
+# Create test executable
+add_executable(storage_test
+    UnitTest/storage_test.cpp
+)
+
+# Link libraries
+target_link_libraries(storage_test
+    Storage_lib
+    GTest::gtest_main
+    pthread
+)
+
+# Enable automatic test discovery
+gtest_discover_tests(storage_test)
+
+# ---------------------------------------------------
+# 8. Benchmark Section
 # ---------------------------------------------------
 
 # Find Google Benchmark
@@ -107,9 +134,6 @@ target_link_libraries(index_benchmark
 # Ensure optimized build for benchmarking
 target_compile_options(index_benchmark PRIVATE -O3 -march=native)
 
-
-
-
 # Configure: cmake ..
 # Build: make
 
@@ -121,4 +145,5 @@ target_compile_options(index_benchmark PRIVATE -O3 -march=native)
 # ./linearHashing_test
 # ./rangeLH_test
 # ./bPlusTree_test
+# ./storage_test
 # ./index_benchmark
